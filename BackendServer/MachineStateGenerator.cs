@@ -6,12 +6,15 @@ namespace BackendServer;
 public class MachineStateGenerator : BackgroundService
 {
     private readonly IHubContext<MachineStateHub> _hubContext;
-
+    private readonly Random _random = new Random();
+    private readonly Dictionary<Guid, MachineState> _lastMachineStates = new();
     private readonly Dictionary<Guid, string> _machineOrders = new()
     {
         { new Guid("c7d93c96-002a-49a2-9008-db8398ba646b"), "InjectionMoulding" },
         { new Guid("dd6de547-c60c-4f78-805c-365a69312366"), "InjectionMoulding" },
         { new Guid("c39e1298-0d3d-4a0f-a01b-b75bb45c8f3a"), "InjectionMoulding" },
+        { new Guid("f6ea9d4e-fcee-4e59-9ca4-21ba3ac7f911"), "InjectionMoulding" },
+        { new Guid("dd8d9ba8-88da-4077-8909-40c07811171f"), "InjectionMoulding" },
         { new Guid("3564497c-c25b-49da-9107-79a7d3d0dd49"), "Sorting" },
         { new Guid("f58304b3-f483-424b-a7b1-c3a820b08c68"), "Sorting" },
         { new Guid("a4e633db-dadc-4b1c-b20b-933c8cf3f601"), "Packing" },
@@ -37,6 +40,16 @@ public class MachineStateGenerator : BackgroundService
     private async Task GenerateMachineStatesAsync(CancellationToken cancellationToken)
     {
         var order = GetRandomMachineOrder();
+        var newState = GetRandomState();
+        
+        // Avoid sending the same state consecutively for the same order
+        if (_lastMachineStates.TryGetValue(order, out var lastState) && lastState == newState)
+        {
+            return;
+        }
+        
+        _lastMachineStates[order] = newState;
+        
         var machineStateEvent = new MachineStateEvent
         {
             OrderGuid = order,
@@ -51,8 +64,7 @@ public class MachineStateGenerator : BackgroundService
     private Guid GetRandomMachineOrder()
     {
         List<Guid> keyList = new List<Guid>(_machineOrders.Keys);
-        Random random = new Random();
-        Guid randomGuid = keyList[random.Next(keyList.Count)];
+        Guid randomGuid = keyList[_random.Next(keyList.Count)];
 
         return randomGuid;
     }
@@ -60,8 +72,7 @@ public class MachineStateGenerator : BackgroundService
     private MachineState GetRandomState()
     {
         var values = Enum.GetValues(typeof(MachineState));
-        Random random = new Random();
-        MachineState randomState = (MachineState)values.GetValue(random.Next(values.Length))!;
+        MachineState randomState = (MachineState)values.GetValue(_random.Next(values.Length))!;
 
         return randomState;
     }
